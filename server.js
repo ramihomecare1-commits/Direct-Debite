@@ -1,5 +1,5 @@
 const express = require('express');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -11,6 +11,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
+// Helper to format date to DD.MM.YYYY
+function getFormattedDate(date = new Date()) {
+    const d = new Date(date);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}`;
+}
+
 // GET / - Serve the form
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -18,6 +27,7 @@ app.get('/', (req, res) => {
 
 // POST /fill - Generate filled PDF
 app.post('/fill', async (req, res) => {
+    console.log('Received fill request:', req.body);
     try {
         // Validate input
         const { name, iban, bankName, amount } = req.body;
@@ -50,6 +60,7 @@ app.post('/fill', async (req, res) => {
         try {
             await fs.access(templatePath);
         } catch (error) {
+            console.error('Template not found:', templatePath);
             return res.status(500).json({
                 error: 'PDF template not found. Please contact administrator.'
             });
@@ -59,7 +70,7 @@ app.post('/fill', async (req, res) => {
         const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
         // Get current date
-        const currentDate = new Date().toLocaleDateString('en-GB');
+        const currentDate = getFormattedDate();
 
         // Check if PDF has form fields
         const form = pdfDoc.getForm();
@@ -94,8 +105,6 @@ app.post('/fill', async (req, res) => {
             // PDF has no form fields - draw text directly on the page
             // This is a static PDF, so we'll overlay text at specific coordinates
             try {
-                const { StandardFonts, rgb } = require('pdf-lib');
-
                 // Get the first page
                 const pages = pdfDoc.getPages();
                 const firstPage = pages[0];
@@ -108,8 +117,12 @@ app.post('/fill', async (req, res) => {
 
                 // Helper function to draw text character by character
                 const drawCharByChar = (text, startX, startY, spacing = charSpacing) => {
+                    if (!text) return;
                     const chars = text.toString().split('');
                     chars.forEach((char, index) => {
+                        // Skip separators if they are already on the PDF
+                        if (char === '/' || char === '.') return;
+
                         firstPage.drawText(char, {
                             x: startX + (index * spacing),
                             y: startY,
@@ -140,12 +153,12 @@ app.post('/fill', async (req, res) => {
                 drawCharByChar(ibanClean, 235, fromTop(290), 13.5);
 
                 // Row 5: Mobile Number - 10 digits (05XXXXXXXX)
-                const mobile = req.body.mobile || '0500000000';
+                const mobile = req.body.mobile || '';
                 drawCharByChar(mobile, 235, fromTop(330), 13.5);
 
                 // Row 7: Issued for - DD MM YYYY (with spacing between groups)
                 const issuedDate = req.body.commenceDate || currentDate;
-                const issuedParts = issuedDate.split('/');
+                const issuedParts = issuedDate.split(/[./]/);
                 if (issuedParts.length === 3) {
                     drawCharByChar(issuedParts[0], 235, fromTop(410), 27); // DD
                     drawCharByChar(issuedParts[1], 315, fromTop(410), 27); // MM
@@ -154,7 +167,7 @@ app.post('/fill', async (req, res) => {
 
                 // Row 8: Commences On - DD/MM/YYYY
                 const commenceDate = req.body.commenceDate || currentDate;
-                const commenceParts = commenceDate.split('/');
+                const commenceParts = commenceDate.split(/[./]/);
                 if (commenceParts.length === 3) {
                     drawCharByChar(commenceParts[0], 320, fromTop(450), 13.5); // DD
                     drawCharByChar(commenceParts[1], 380, fromTop(450), 13.5); // MM
@@ -163,7 +176,7 @@ app.post('/fill', async (req, res) => {
 
                 // Row 9: Expires On - DD/MM/YYYY
                 const expireDate = req.body.expireDate || currentDate;
-                const expireParts = expireDate.split('/');
+                const expireParts = expireDate.split(/[./]/);
                 if (expireParts.length === 3) {
                     drawCharByChar(expireParts[0], 320, fromTop(490), 13.5); // DD
                     drawCharByChar(expireParts[1], 380, fromTop(490), 13.5); // MM

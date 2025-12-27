@@ -279,11 +279,11 @@
                 amount: document.getElementById('amount').value
             };
 
-            // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
+            // Helper function to convert YYYY-MM-DD to DD.MM.YYYY
             function formatDateToDDMMYYYY(dateStr) {
                 if (!dateStr) return '';
                 const parts = dateStr.split('-');
-                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                return `${parts[2]}.${parts[1]}.${parts[0]}`;
             }
 
             // Show loading state
