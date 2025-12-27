@@ -58,42 +58,112 @@ app.post('/fill', async (req, res) => {
         const existingPdfBytes = await fs.readFile(templatePath);
         const pdfDoc = await PDFDocument.load(existingPdfBytes);
 
-        // Get the form from the PDF
-        const form = pdfDoc.getForm();
-
         // Get current date
         const currentDate = new Date().toLocaleDateString('en-GB');
 
-        // Fill the form fields
-        // Note: Field names need to be verified with actual PDF template
-        try {
-            // Common DDA form field names (adjust based on actual PDF)
-            const nameField = form.getTextField('accountHolderName') || form.getTextField('name') || form.getTextField('fullName');
-            const ibanField = form.getTextField('iban') || form.getTextField('accountNumber');
-            const bankField = form.getTextField('bankName') || form.getTextField('bank');
-            const amountField = form.getTextField('amount') || form.getTextField('fixedAmount');
+        // Check if PDF has form fields
+        const form = pdfDoc.getForm();
+        const fields = form.getFields();
 
-            if (nameField) nameField.setText(name);
-            if (ibanField) ibanField.setText(iban);
-            if (bankField) bankField.setText(bankName);
-            if (amountField) amountField.setText(amount.toString());
-
-            // Try to fill date field if exists
+        if (fields.length > 0) {
+            // PDF has fillable form fields - use form filling
             try {
-                const dateField = form.getTextField('date') || form.getTextField('signatureDate');
-                if (dateField) dateField.setText(currentDate);
-            } catch (e) {
-                // Date field might not exist, continue
+                const nameField = form.getTextField('accountHolderName') || form.getTextField('name') || form.getTextField('fullName');
+                const ibanField = form.getTextField('iban') || form.getTextField('accountNumber');
+                const bankField = form.getTextField('bankName') || form.getTextField('bank');
+                const amountField = form.getTextField('amount') || form.getTextField('fixedAmount');
+
+                if (nameField) nameField.setText(name);
+                if (ibanField) ibanField.setText(iban);
+                if (bankField) bankField.setText(bankName);
+                if (amountField) amountField.setText(amount.toString());
+
+                try {
+                    const dateField = form.getTextField('date') || form.getTextField('signatureDate');
+                    if (dateField) dateField.setText(currentDate);
+                } catch (e) {
+                    // Date field might not exist
+                }
+            } catch (error) {
+                console.error('Error filling form fields:', error);
+                return res.status(500).json({
+                    error: 'Error mapping form fields. PDF template may need field name verification.'
+                });
             }
+        } else {
+            // PDF has no form fields - draw text directly on the page
+            // This is a static PDF, so we'll overlay text at specific coordinates
+            try {
+                const { StandardFonts, rgb } = require('pdf-lib');
 
-            // Flatten the form to make it non-editable (optional)
-            // form.flatten();
+                // Get the first page (adjust if your form is on a different page)
+                const pages = pdfDoc.getPages();
+                const firstPage = pages[0];
 
-        } catch (error) {
-            console.error('Error filling form fields:', error);
-            return res.status(500).json({
-                error: 'Error mapping form fields. PDF template may need field name verification.'
-            });
+                // Embed a standard font
+                const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+                const fontSize = 10;
+
+                // TODO: Adjust these coordinates based on your actual PDF layout
+                // You'll need to determine the exact X,Y positions for each field
+                // PDF coordinates start from bottom-left corner
+
+                // Example coordinates (these need to be adjusted for your specific PDF)
+                const fieldPositions = {
+                    name: { x: 150, y: 650 },
+                    iban: { x: 150, y: 600 },
+                    bankName: { x: 150, y: 550 },
+                    amount: { x: 150, y: 500 },
+                    date: { x: 150, y: 450 }
+                };
+
+                // Draw text on the PDF
+                firstPage.drawText(name, {
+                    x: fieldPositions.name.x,
+                    y: fieldPositions.name.y,
+                    size: fontSize,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                });
+
+                firstPage.drawText(iban, {
+                    x: fieldPositions.iban.x,
+                    y: fieldPositions.iban.y,
+                    size: fontSize,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                });
+
+                firstPage.drawText(bankName, {
+                    x: fieldPositions.bankName.x,
+                    y: fieldPositions.bankName.y,
+                    size: fontSize,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                });
+
+                firstPage.drawText(amount.toString(), {
+                    x: fieldPositions.amount.x,
+                    y: fieldPositions.amount.y,
+                    size: fontSize,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                });
+
+                firstPage.drawText(currentDate, {
+                    x: fieldPositions.date.x,
+                    y: fieldPositions.date.y,
+                    size: fontSize,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                });
+
+            } catch (error) {
+                console.error('Error drawing text on PDF:', error);
+                return res.status(500).json({
+                    error: 'Error adding text to PDF. Please contact administrator.'
+                });
+            }
         }
 
         // Save the filled PDF
