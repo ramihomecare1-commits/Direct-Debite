@@ -103,8 +103,8 @@ app.post('/fill', async (req, res) => {
 
                 // Embed a standard font
                 const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-                const fontSize = 10;
-                const charSpacing = 14; // Space between each character box
+                const fontSize = 9; // Smaller font to fit in boxes
+                const charSpacing = 13.5; // Space between each character box
 
                 // Helper function to draw text character by character
                 const drawCharByChar = (text, startX, startY, spacing = charSpacing) => {
@@ -121,8 +121,7 @@ app.post('/fill', async (req, res) => {
                 };
 
                 // Helper function to draw checkbox (X mark)
-                const drawCheckbox = (x, y, size = 8) => {
-                    // Draw X mark
+                const drawCheckbox = (x, y, size = 10) => {
                     firstPage.drawText('X', {
                         x: x,
                         y: y,
@@ -136,50 +135,52 @@ app.post('/fill', async (req, res) => {
                 // PDF height is 842, so: y = 842 - yFromTop
                 const fromTop = (yFromTop) => height - yFromTop;
 
-                // Row 4: IBAN - each character in separate box
-                // IBAN format: AE07 0331 2345 6789 0123 456 (remove spaces)
+                // Row 4: IBAN - each character in separate box (23 characters)
                 const ibanClean = iban.replace(/\s/g, '');
-                drawCharByChar(ibanClean, 220, fromTop(245), 14);
+                drawCharByChar(ibanClean, 235, fromTop(290), 13.5);
 
-                // Row 5: Mobile Number - 05 + 8 digits
-                // Assuming mobile is passed or we extract from another field
-                // For now, we'll add it to the form input
+                // Row 5: Mobile Number - 10 digits (05XXXXXXXX)
                 const mobile = req.body.mobile || '0500000000';
-                drawCharByChar(mobile, 220, fromTop(285), 14);
+                drawCharByChar(mobile, 235, fromTop(330), 13.5);
+
+                // Row 7: Issued for - DD MM YYYY (with spacing between groups)
+                const issuedDate = req.body.commenceDate || currentDate;
+                const issuedParts = issuedDate.split('/');
+                if (issuedParts.length === 3) {
+                    drawCharByChar(issuedParts[0], 235, fromTop(410), 27); // DD
+                    drawCharByChar(issuedParts[1], 315, fromTop(410), 27); // MM
+                    drawCharByChar(issuedParts[2], 395, fromTop(410), 27); // YYYY
+                }
 
                 // Row 8: Commences On - DD/MM/YYYY
                 const commenceDate = req.body.commenceDate || currentDate;
-                const commenceParts = commenceDate.split('/'); // Expecting DD/MM/YYYY
+                const commenceParts = commenceDate.split('/');
                 if (commenceParts.length === 3) {
-                    // DD
-                    drawCharByChar(commenceParts[0], 220, fromTop(405), 14);
-                    // MM
-                    drawCharByChar(commenceParts[1], 285, fromTop(405), 14);
-                    // YYYY
-                    drawCharByChar(commenceParts[2], 350, fromTop(405), 14);
+                    drawCharByChar(commenceParts[0], 320, fromTop(450), 13.5); // DD
+                    drawCharByChar(commenceParts[1], 380, fromTop(450), 13.5); // MM
+                    drawCharByChar(commenceParts[2], 445, fromTop(450), 13.5); // YYYY
                 }
 
                 // Row 9: Expires On - DD/MM/YYYY
                 const expireDate = req.body.expireDate || currentDate;
                 const expireParts = expireDate.split('/');
                 if (expireParts.length === 3) {
-                    // DD
-                    drawCharByChar(expireParts[0], 220, fromTop(445), 14);
-                    // MM
-                    drawCharByChar(expireParts[1], 285, fromTop(445), 14);
-                    // YYYY
-                    drawCharByChar(expireParts[2], 350, fromTop(445), 14);
+                    drawCharByChar(expireParts[0], 320, fromTop(490), 13.5); // DD
+                    drawCharByChar(expireParts[1], 380, fromTop(490), 13.5); // MM
+                    drawCharByChar(expireParts[2], 445, fromTop(490), 13.5); // YYYY
                 }
 
                 // Row 11: Payment Frequency - tick Monthly checkbox
-                drawCheckbox(305, fromTop(530), 10);
+                drawCheckbox(335, fromTop(575), 10);
 
-                // Row 12: Fixed Amount 1 - each digit in separate box
-                const amountStr = amount.toString().padStart(10, ' ');
-                drawCharByChar(amountStr, 220, fromTop(610), 14);
+                // Row 12: Fixed Amount 1 - right-align the amount in boxes
+                const amountStr = amount.toString();
+                const amountSpacing = 20;
+                drawCharByChar(amountStr, 235, fromTop(640), amountSpacing);
 
-                // Row 13: Fixed Amount 2 (same as amount 1 for now)
-                drawCharByChar(amountStr, 220, fromTop(650), 14);
+                // Row 13: Fixed Amount 2 (same as amount 1)
+                drawCharByChar(amountStr, 235, fromTop(680), amountSpacing);
+
 
             } catch (error) {
                 console.error('Error drawing text on PDF:', error);
