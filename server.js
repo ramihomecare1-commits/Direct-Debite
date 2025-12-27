@@ -96,67 +96,90 @@ app.post('/fill', async (req, res) => {
             try {
                 const { StandardFonts, rgb } = require('pdf-lib');
 
-                // Get the first page (adjust if your form is on a different page)
+                // Get the first page
                 const pages = pdfDoc.getPages();
                 const firstPage = pages[0];
+                const { height } = firstPage.getSize();
 
                 // Embed a standard font
                 const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
                 const fontSize = 10;
+                const charSpacing = 14; // Space between each character box
 
-                // TODO: Adjust these coordinates based on your actual PDF layout
-                // You'll need to determine the exact X,Y positions for each field
-                // PDF coordinates start from bottom-left corner
-
-                // Example coordinates (these need to be adjusted for your specific PDF)
-                const fieldPositions = {
-                    name: { x: 150, y: 650 },
-                    iban: { x: 150, y: 600 },
-                    bankName: { x: 150, y: 550 },
-                    amount: { x: 150, y: 500 },
-                    date: { x: 150, y: 450 }
+                // Helper function to draw text character by character
+                const drawCharByChar = (text, startX, startY, spacing = charSpacing) => {
+                    const chars = text.toString().split('');
+                    chars.forEach((char, index) => {
+                        firstPage.drawText(char, {
+                            x: startX + (index * spacing),
+                            y: startY,
+                            size: fontSize,
+                            font: font,
+                            color: rgb(0, 0, 0),
+                        });
+                    });
                 };
 
-                // Draw text on the PDF
-                firstPage.drawText(name, {
-                    x: fieldPositions.name.x,
-                    y: fieldPositions.name.y,
-                    size: fontSize,
-                    font: font,
-                    color: rgb(0, 0, 0),
-                });
+                // Helper function to draw checkbox (X mark)
+                const drawCheckbox = (x, y, size = 8) => {
+                    // Draw X mark
+                    firstPage.drawText('X', {
+                        x: x,
+                        y: y,
+                        size: size,
+                        font: font,
+                        color: rgb(0, 0, 0),
+                    });
+                };
 
-                firstPage.drawText(iban, {
-                    x: fieldPositions.iban.x,
-                    y: fieldPositions.iban.y,
-                    size: fontSize,
-                    font: font,
-                    color: rgb(0, 0, 0),
-                });
+                // Calculate Y positions from top (easier to measure from image)
+                // PDF height is 842, so: y = 842 - yFromTop
+                const fromTop = (yFromTop) => height - yFromTop;
 
-                firstPage.drawText(bankName, {
-                    x: fieldPositions.bankName.x,
-                    y: fieldPositions.bankName.y,
-                    size: fontSize,
-                    font: font,
-                    color: rgb(0, 0, 0),
-                });
+                // Row 4: IBAN - each character in separate box
+                // IBAN format: AE07 0331 2345 6789 0123 456 (remove spaces)
+                const ibanClean = iban.replace(/\s/g, '');
+                drawCharByChar(ibanClean, 220, fromTop(245), 14);
 
-                firstPage.drawText(amount.toString(), {
-                    x: fieldPositions.amount.x,
-                    y: fieldPositions.amount.y,
-                    size: fontSize,
-                    font: font,
-                    color: rgb(0, 0, 0),
-                });
+                // Row 5: Mobile Number - 05 + 8 digits
+                // Assuming mobile is passed or we extract from another field
+                // For now, we'll add it to the form input
+                const mobile = req.body.mobile || '0500000000';
+                drawCharByChar(mobile, 220, fromTop(285), 14);
 
-                firstPage.drawText(currentDate, {
-                    x: fieldPositions.date.x,
-                    y: fieldPositions.date.y,
-                    size: fontSize,
-                    font: font,
-                    color: rgb(0, 0, 0),
-                });
+                // Row 8: Commences On - DD/MM/YYYY
+                const commenceDate = req.body.commenceDate || currentDate;
+                const commenceParts = commenceDate.split('/'); // Expecting DD/MM/YYYY
+                if (commenceParts.length === 3) {
+                    // DD
+                    drawCharByChar(commenceParts[0], 220, fromTop(405), 14);
+                    // MM
+                    drawCharByChar(commenceParts[1], 285, fromTop(405), 14);
+                    // YYYY
+                    drawCharByChar(commenceParts[2], 350, fromTop(405), 14);
+                }
+
+                // Row 9: Expires On - DD/MM/YYYY
+                const expireDate = req.body.expireDate || currentDate;
+                const expireParts = expireDate.split('/');
+                if (expireParts.length === 3) {
+                    // DD
+                    drawCharByChar(expireParts[0], 220, fromTop(445), 14);
+                    // MM
+                    drawCharByChar(expireParts[1], 285, fromTop(445), 14);
+                    // YYYY
+                    drawCharByChar(expireParts[2], 350, fromTop(445), 14);
+                }
+
+                // Row 11: Payment Frequency - tick Monthly checkbox
+                drawCheckbox(305, fromTop(530), 10);
+
+                // Row 12: Fixed Amount 1 - each digit in separate box
+                const amountStr = amount.toString().padStart(10, ' ');
+                drawCharByChar(amountStr, 220, fromTop(610), 14);
+
+                // Row 13: Fixed Amount 2 (same as amount 1 for now)
+                drawCharByChar(amountStr, 220, fromTop(650), 14);
 
             } catch (error) {
                 console.error('Error drawing text on PDF:', error);
