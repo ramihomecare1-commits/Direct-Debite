@@ -144,28 +144,46 @@ app.post('/fill', async (req, res) => {
                     });
                 };
 
-                // Calculate Y positions from top (easier to measure from image)
-                // PDF height is 842, so: y = 842 - yFromTop
+                // Calculate Y positions from top
                 const fromTop = (yFromTop) => height - yFromTop;
 
-                // Row 4: IBAN - each character in separate box (23 characters)
+                // Row 1: Bank Name
+                firstPage.drawText(bankName, {
+                    x: 235,
+                    y: fromTop(170),
+                    size: 11,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                });
+
+                // Row 2: Title of Account (Name)
+                firstPage.drawText(name, {
+                    x: 235,
+                    y: fromTop(210),
+                    size: 11,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                });
+
+                // Row 3: Account Type (Tick Current/Savings)
+                drawCheckbox(405, fromTop(250), 10);
+
+                // Row 4: IBAN - each character in separate box
                 const ibanClean = iban.replace(/\s/g, '');
                 drawCharByChar(ibanClean, 235, fromTop(290), 13.5);
 
-                // Row 5: Mobile Number - 10 digits (05XXXXXXXX)
+                // Row 5: Mobile Number
                 const mobile = req.body.mobile || '';
                 drawCharByChar(mobile, 235, fromTop(330), 13.5);
 
-                // Row 7: Issued for - DD MM YYYY (with spacing between groups)
+                // Row 7: Issued for - DD MM YYYY (8 boxes in a row)
                 const issuedDate = req.body.commenceDate || currentDate;
-                const issuedParts = issuedDate.split(/[./]/);
-                if (issuedParts.length === 3) {
-                    drawCharByChar(issuedParts[0], 235, fromTop(410), 27); // DD
-                    drawCharByChar(issuedParts[1], 315, fromTop(410), 27); // MM
-                    drawCharByChar(issuedParts[2], 395, fromTop(410), 27); // YYYY
+                const issuedClean = issuedDate.replace(/[./]/g, '');
+                if (issuedClean.length === 8) {
+                    drawCharByChar(issuedClean, 380, fromTop(410), 15);
                 }
 
-                // Row 8: Commences On - DD/MM/YYYY
+                // Row 8: Commences On - DD / MM / YYYY
                 const commenceDate = req.body.commenceDate || currentDate;
                 const commenceParts = commenceDate.split(/[./]/);
                 if (commenceParts.length === 3) {
@@ -174,7 +192,7 @@ app.post('/fill', async (req, res) => {
                     drawCharByChar(commenceParts[2], 445, fromTop(450), 13.5); // YYYY
                 }
 
-                // Row 9: Expires On - DD/MM/YYYY
+                // Row 9: Expires On - DD / MM / YYYY
                 const expireDate = req.body.expireDate || currentDate;
                 const expireParts = expireDate.split(/[./]/);
                 if (expireParts.length === 3) {
@@ -186,13 +204,12 @@ app.post('/fill', async (req, res) => {
                 // Row 11: Payment Frequency - tick Monthly checkbox
                 drawCheckbox(335, fromTop(575), 10);
 
-                // Row 12: Fixed Amount 1 - right-align the amount in boxes
+                // Row 12: Fixed Amount 1
                 const amountStr = amount.toString();
-                const amountSpacing = 20;
-                drawCharByChar(amountStr, 235, fromTop(640), amountSpacing);
+                drawCharByChar(amountStr, 235, fromTop(640), 20);
 
-                // Row 13: Fixed Amount 2 (same as amount 1)
-                drawCharByChar(amountStr, 235, fromTop(680), amountSpacing);
+                // Row 13: Fixed Amount 2
+                drawCharByChar(amountStr, 235, fromTop(680), 20);
 
 
             } catch (error) {
