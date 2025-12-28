@@ -193,60 +193,66 @@
             const fieldList = document.getElementById('fieldList');
 
             fields.forEach(field => {
-                // Create Marker
-                const el = document.createElement('div');
-                el.className = 'marker';
-                el.id = `marker-${field.id}`;
-
-                // Render content based on type
                 if (field.type === 'chars') {
-                    el.style.display = 'flex';
-                    el.style.alignItems = 'center';
-                    el.style.justifyContent = 'flex-start'; // Align left
-                    el.style.background = 'rgba(0, 255, 0, 0.1)'; // Lighter green for data
-                    el.style.border = '1px dashed green';
-                    el.style.color = 'black';
-                    el.style.fontFamily = 'Helvetica, sans-serif';
-                    el.style.fontSize = `${9 * scale}px`; // Scale font size
-                    el.style.whiteSpace = 'nowrap';
-
-                    // Generate character spans
+                    // Explode into individual markers
                     const chars = field.sample.split('');
                     chars.forEach((char, i) => {
-                        const span = document.createElement('span');
-                        span.textContent = char;
-                        span.style.position = 'absolute';
-                        span.style.left = `${i * field.spacing * scale}px`; // Exact spacing
-                        el.appendChild(span);
+                        const el = document.createElement('div');
+                        el.className = 'marker';
+                        el.id = `marker-${field.id}-${i}`;
+                        el.textContent = char;
+                        el.dataset.parentId = field.id;
+                        el.dataset.index = i;
+
+                        // Style for individual char box
+                        el.style.width = `${12 * scale}px`; // Approx width of a char box
+                        el.style.height = `${field.h * scale}px`;
+                        el.style.display = 'flex';
+                        el.style.alignItems = 'center';
+                        el.style.justifyContent = 'center';
+                        el.style.background = 'rgba(0, 255, 0, 0.2)';
+                        el.style.border = '1px solid green';
+                        el.style.fontSize = `${9 * scale}px`;
+
+                        // Initial Position
+                        const startX = field.x * scale;
+                        const spacing = field.spacing * scale;
+                        el.style.left = `${startX + (i * spacing)}px`;
+                        el.style.top = `${field.y * scale}px`;
+
+                        makeDraggable(el, scale, field, i);
+                        container.appendChild(el);
                     });
 
-                    // Width needs to accommodate all chars
-                    const totalWidth = field.sample.length * field.spacing * scale;
-                    el.style.width = `${totalWidth}px`;
+                    // Add summary item to list
+                    const item = document.createElement('div');
+                    item.className = 'field-item';
+                    item.innerHTML = `<span>${field.label} (${chars.length} chars)</span> <span id="coord-${field.id}">Move chars individually</span>`;
+                    fieldList.appendChild(item);
 
                 } else {
+                    // Standard single box
+                    const el = document.createElement('div');
+                    el.className = 'marker';
+                    el.id = `marker-${field.id}`;
                     el.textContent = field.sample || field.label;
                     el.style.width = `${field.w * scale}px`;
+                    el.style.height = `${field.h * scale}px`;
+                    el.style.left = `${field.x * scale}px`;
+                    el.style.top = `${field.y * scale}px`;
+
+                    makeDraggable(el, scale, field);
+                    container.appendChild(el);
+
+                    const item = document.createElement('div');
+                    item.className = 'field-item';
+                    item.innerHTML = `<span>${field.label}</span> <span id="coord-${field.id}">X:${field.x}, Y:${field.y}</span>`;
+                    fieldList.appendChild(item);
                 }
-
-                el.style.height = `${field.h * scale}px`;
-
-                // Initial Position
-                el.style.left = `${field.x * scale}px`;
-                el.style.top = `${field.y * scale}px`;
-
-                makeDraggable(el, scale, field);
-                container.appendChild(el);
-
-                // Add to list
-                const item = document.createElement('div');
-                item.className = 'field-item';
-                item.innerHTML = `<span>${field.label}</span> <span id="coord-${field.id}">X:${field.x}, Y:${field.y}</span>`;
-                fieldList.appendChild(item);
             });
         }
 
-        function makeDraggable(el, scale, field) {
+        function makeDraggable(el, scale, field, index = null) {
             let isDragging = false;
             let startX, startY, initialLeft, initialTop;
 
@@ -271,14 +277,18 @@
                 el.style.left = `${newLeft}px`;
                 el.style.top = `${newTop}px`;
 
-                // Update coordinates display (convert back to PDF points)
+                // Update coordinates display
                 const pdfX = Math.round(newLeft / scale);
                 const pdfY = Math.round(newTop / scale);
 
-                field.x = pdfX;
-                field.y = pdfY;
-
-                document.getElementById(`coord-${field.id}`).textContent = `X:${pdfX}, Y:${pdfY}`;
+                if (index === null) {
+                    field.x = pdfX;
+                    field.y = pdfY;
+                    document.getElementById(`coord-${field.id}`).textContent = `X:${pdfX}, Y:${pdfY}`;
+                } else {
+                    // For chars, we don't update the main field object directly here
+                    // We'll calculate it in generateConfig
+                }
             });
 
             window.addEventListener('mouseup', () => {
@@ -288,16 +298,51 @@
         }
 
         function generateConfig() {
-            const config = fields.reduce((acc, field) => {
-                acc[field.id] = { x: field.x, y: field.y };
-                return acc;
-            }, {});
+            const config = {};
+
+            fields.forEach(field => {
+                if (field.type === 'chars') {
+                    // Calculate best fit from individual markers
+                    const chars = field.sample.split('');
+                    let firstX = 0, lastX = 0, avgY = 0;
+
+                    // Get positions of first and last char
+                    const firstEl = document.getElementById(`marker-${field.id}-0`);
+                    const lastEl = document.getElementById(`marker-${field.id}-${chars.length - 1}`);
+
+                    // Calculate average Y from all chars
+                    let totalY = 0;
+                    for (let i = 0; i < chars.length; i++) {
+                        const el = document.getElementById(`marker-${field.id}-${i}`);
+                        totalY += parseFloat(el.style.top);
+                    }
+                    avgY = totalY / chars.length;
+
+                    // Convert to PDF coords
+                    const scale = 1.5; // Hardcoded for now, should match loadPDF
+                    const pdfFirstX = Math.round(parseFloat(firstEl.style.left) / scale);
+                    const pdfLastX = Math.round(parseFloat(lastEl.style.left) / scale);
+                    const pdfY = Math.round(avgY / scale);
+
+                    // Calculate spacing
+                    // Distance between first and last char divided by number of gaps
+                    const totalDist = pdfLastX - pdfFirstX;
+                    const gaps = chars.length - 1;
+                    const spacing = Number((totalDist / gaps).toFixed(2));
+
+                    config[field.id] = {
+                        x: pdfFirstX,
+                        y: pdfY,
+                        spacing: spacing
+                    };
+
+                } else {
+                    config[field.id] = { x: field.x, y: field.y };
+                }
+            });
 
             const json = JSON.stringify(config, null, 2);
             document.getElementById('output').value = json;
-
-            // Also format as JS code for server.js
-            console.log("Copy this to server.js:");
             console.log(json);
         }
 
