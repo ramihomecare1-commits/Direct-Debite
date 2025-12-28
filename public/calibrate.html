@@ -146,26 +146,31 @@
         let pdfHeight = 0;
 
         async function loadPDF() {
-            const loadingTask = pdfjsLib.getDocument('/DDA_FORM.pdf');
-            const pdf = await loadingTask.promise;
-            const page = await pdf.getPage(1);
+            try {
+                const loadingTask = pdfjsLib.getDocument('/DDA_FORM.pdf');
+                const pdf = await loadingTask.promise;
+                const page = await pdf.getPage(1);
 
-            const scale = 1.5;
-            const viewport = page.getViewport({ scale });
-            pdfHeight = viewport.height / scale; // Original PDF height
+                const scale = 1.5;
+                const viewport = page.getViewport({ scale });
+                pdfHeight = viewport.height / scale; // Original PDF height
 
-            const canvas = document.getElementById('the-canvas');
-            const context = canvas.getContext('2d');
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+                const canvas = document.getElementById('the-canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
 
-            const renderContext = {
-                canvasContext: context,
-                viewport: viewport
-            };
-            await page.render(renderContext).promise;
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                await page.render(renderContext).promise;
 
-            initMarkers(scale);
+                initMarkers(scale);
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                alert('Error loading PDF: ' + error.message + '\n\nMake sure DDA_FORM.pdf is in the public folder.');
+            }
         }
 
         function initMarkers(scale) {
