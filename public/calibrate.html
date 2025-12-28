@@ -129,18 +129,33 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+        // Fields with simulation data
+        // Spacing must match server.js: IBAN/Mobile=13.5, Dates=15 or 13.5, Amount=20
         const fields = [
-            { id: 'bankName', label: 'Bank Name', x: 235, y: 170, w: 200, h: 20 },
-            { id: 'name', label: 'Account Title', x: 235, y: 210, w: 200, h: 20 },
-            { id: 'type', label: 'Account Type (Tick)', x: 405, y: 250, w: 20, h: 20 },
-            { id: 'iban', label: 'IBAN (Start)', x: 230, y: 295, w: 300, h: 20 },
-            { id: 'mobile', label: 'Mobile (Start)', x: 235, y: 330, w: 150, h: 20 },
-            { id: 'issued', label: 'Issued Date', x: 380, y: 410, w: 150, h: 20 },
-            { id: 'commence', label: 'Commence Date', x: 320, y: 450, w: 150, h: 20 },
-            { id: 'expire', label: 'Expire Date', x: 320, y: 490, w: 150, h: 20 },
-            { id: 'freq', label: 'Monthly (Tick)', x: 335, y: 575, w: 20, h: 20 },
-            { id: 'amt1', label: 'Amount 1', x: 235, y: 640, w: 100, h: 20 },
-            { id: 'amt2', label: 'Amount 2', x: 235, y: 680, w: 100, h: 20 },
+            { id: 'bankName', label: 'Bank Name', x: 216, y: 262, w: 200, h: 20, type: 'text', sample: 'ADCB Bank' },
+            { id: 'name', label: 'Account Title', x: 193, y: 282, w: 200, h: 20, type: 'text', sample: 'John Doe' },
+            { id: 'type', label: 'Type', x: 248, y: 302, w: 20, h: 20, type: 'text', sample: 'X' },
+
+            // IBAN: 23 chars, spacing 13.5
+            { id: 'iban', label: 'IBAN', x: 155, y: 327, w: 350, h: 20, type: 'chars', sample: 'AE070331234567890123456', spacing: 13.5 },
+
+            // Mobile: 10 chars, spacing 13.5
+            { id: 'mobile', label: 'Mobile', x: 217, y: 353, w: 150, h: 20, type: 'chars', sample: '0501234567', spacing: 13.5 },
+
+            // Issued: DD MM YYYY (grouped)
+            // We simulate the first group (DD) and show others relatively? 
+            // Better to just show the first group for alignment, or all if possible.
+            // server.js draws them at x, x+60, x+125.
+            // Let's just allow aligning the START of the date (DD) for now.
+            { id: 'issued', label: 'Issued (DD)', x: 222, y: 393, w: 40, h: 20, type: 'chars', sample: '01', spacing: 15 },
+
+            { id: 'commence', label: 'Commence (DD)', x: 221, y: 415, w: 40, h: 20, type: 'chars', sample: '01', spacing: 13.5 },
+            { id: 'expire', label: 'Expire (DD)', x: 220, y: 437, w: 40, h: 20, type: 'chars', sample: '01', spacing: 13.5 },
+
+            { id: 'freq', label: 'Monthly', x: 207, y: 493, w: 20, h: 20, type: 'text', sample: 'X' },
+
+            { id: 'amt1', label: 'Amount 1', x: 198, y: 524, w: 100, h: 20, type: 'chars', sample: '1000', spacing: 20 },
+            { id: 'amt2', label: 'Amount 2', x: 202, y: 551, w: 100, h: 20, type: 'chars', sample: '1000', spacing: 20 },
         ];
 
         let pdfHeight = 0;
@@ -182,14 +197,41 @@
                 const el = document.createElement('div');
                 el.className = 'marker';
                 el.id = `marker-${field.id}`;
-                el.textContent = field.label;
-                el.style.width = `${field.w * scale}px`;
+
+                // Render content based on type
+                if (field.type === 'chars') {
+                    el.style.display = 'flex';
+                    el.style.alignItems = 'center';
+                    el.style.justifyContent = 'flex-start'; // Align left
+                    el.style.background = 'rgba(0, 255, 0, 0.1)'; // Lighter green for data
+                    el.style.border = '1px dashed green';
+                    el.style.color = 'black';
+                    el.style.fontFamily = 'Helvetica, sans-serif';
+                    el.style.fontSize = `${9 * scale}px`; // Scale font size
+                    el.style.whiteSpace = 'nowrap';
+
+                    // Generate character spans
+                    const chars = field.sample.split('');
+                    chars.forEach((char, i) => {
+                        const span = document.createElement('span');
+                        span.textContent = char;
+                        span.style.position = 'absolute';
+                        span.style.left = `${i * field.spacing * scale}px`; // Exact spacing
+                        el.appendChild(span);
+                    });
+
+                    // Width needs to accommodate all chars
+                    const totalWidth = field.sample.length * field.spacing * scale;
+                    el.style.width = `${totalWidth}px`;
+
+                } else {
+                    el.textContent = field.sample || field.label;
+                    el.style.width = `${field.w * scale}px`;
+                }
+
                 el.style.height = `${field.h * scale}px`;
 
-                // Initial Position (convert PDF coords to Canvas coords)
-                // PDF Y is from bottom usually, but pdf-lib uses Y from bottom.
-                // However, our server.js uses "fromTop".
-                // Let's assume the Y in our fields array is "Y from Top".
+                // Initial Position
                 el.style.left = `${field.x * scale}px`;
                 el.style.top = `${field.y * scale}px`;
 
