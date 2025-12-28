@@ -264,10 +264,10 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
+
             // Hide error message
             errorMessage.classList.remove('show');
-            
+
             // Get form data
             const formData = {
                 name: document.getElementById('name').value.trim(),
@@ -301,27 +301,55 @@
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to generate PDF');
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to generate PDF');
+                    } else {
+                        const text = await response.text();
+                        console.error('Server Error:', text);
+                        throw new Error(`Server Error (${response.status}). Please try again.`);
+                    }
                 }
 
                 // Get the PDF blob
                 const blob = await response.blob();
-                
+
                 // Create download link
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = `DDA_${formData.name.replace(/\s/g, '_')}_${Date.now()}.pdf`;
                 document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+
+                try {
+                    a.click();
+                } catch (e) {
+                    console.error('Auto-download failed:', e);
+                    // Fallback: Show a manual download button
+                    const downloadBtn = document.createElement('a');
+                    downloadBtn.href = url;
+                    downloadBtn.download = a.download;
+                    downloadBtn.textContent = 'Click here to download PDF';
+                    downloadBtn.className = 'btn';
+                    downloadBtn.style.background = '#28a745';
+                    downloadBtn.style.marginTop = '10px';
+                    errorMessage.innerHTML = '';
+                    errorMessage.appendChild(downloadBtn);
+                    errorMessage.classList.add('show');
+                }
+
+                // Cleanup after a delay to allow download to start
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }, 1000);
 
                 // Reset form
                 form.reset();
-                
+
             } catch (error) {
+                console.error('Fetch error:', error);
                 errorMessage.textContent = error.message;
                 errorMessage.classList.add('show');
             } finally {
