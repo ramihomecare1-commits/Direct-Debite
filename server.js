@@ -147,21 +147,25 @@ app.post('/fill', async (req, res) => {
                 // Calculate Y positions from top
                 const fromTop = (yFromTop) => height - yFromTop;
 
-                // Base anchor point (Row 1)
-                const anchorY = 170;
-
-                // Helper to apply "Taller Rows" spacing (Variation 6: +2px per row approx)
-                // We calculate distance from anchor and add 5% more spacing (2px per 40px row)
-                const getAdjustedY = (originalY) => {
-                    const dist = originalY - anchorY;
-                    const expansion = dist * 0.05; // 5% expansion
-                    return originalY + expansion;
+                // User-calibrated coordinates
+                const coords = {
+                    bankName: { x: 216, y: 262 },
+                    name: { x: 193, y: 282 },
+                    type: { x: 248, y: 302 },
+                    iban: { x: 155, y: 327 },
+                    mobile: { x: 217, y: 353 },
+                    issued: { x: 222, y: 393 },
+                    commence: { x: 221, y: 415 },
+                    expire: { x: 220, y: 437 },
+                    freq: { x: 207, y: 493 },
+                    amt1: { x: 198, y: 524 },
+                    amt2: { x: 202, y: 551 }
                 };
 
                 // Row 1: Bank Name
                 firstPage.drawText(bankName, {
-                    x: 235,
-                    y: fromTop(anchorY),
+                    x: coords.bankName.x,
+                    y: fromTop(coords.bankName.y),
                     size: 11,
                     font: font,
                     color: rgb(0, 0, 0),
@@ -169,60 +173,61 @@ app.post('/fill', async (req, res) => {
 
                 // Row 2: Title of Account (Name)
                 firstPage.drawText(name, {
-                    x: 235,
-                    y: fromTop(getAdjustedY(210)),
+                    x: coords.name.x,
+                    y: fromTop(coords.name.y),
                     size: 11,
                     font: font,
                     color: rgb(0, 0, 0),
                 });
 
-                // Row 3: Account Type (Tick Current/Savings)
-                drawCheckbox(405, fromTop(getAdjustedY(250)), 10);
+                // Row 3: Account Type (Tick)
+                drawCheckbox(coords.type.x, fromTop(coords.type.y), 10);
 
-                // Row 4: IBAN - Adjusted: Left (-5px) and Down (+5px) relative to expanded row
+                // Row 4: IBAN
                 const ibanClean = iban.replace(/\s/g, '');
-                // Original X: 235 -> New X: 230 (Left)
-                // Original Y: 290 -> Expanded Y -> +5 (Down)
-                drawCharByChar(ibanClean, 230, fromTop(getAdjustedY(290) + 5), 13.5);
+                drawCharByChar(ibanClean, coords.iban.x, fromTop(coords.iban.y), 13.5);
 
                 // Row 5: Mobile Number
                 const mobile = req.body.mobile || '';
-                drawCharByChar(mobile, 235, fromTop(getAdjustedY(330)), 13.5);
+                drawCharByChar(mobile, coords.mobile.x, fromTop(coords.mobile.y), 13.5);
 
-                // Row 7: Issued for - DD MM YYYY (8 boxes in a row)
+                // Row 7: Issued for - DD MM YYYY
                 const issuedDate = req.body.commenceDate || currentDate;
-                const issuedClean = issuedDate.replace(/[./]/g, '');
-                if (issuedClean.length === 8) {
-                    drawCharByChar(issuedClean, 380, fromTop(getAdjustedY(410)), 15);
+                const issuedParts = issuedDate.split(/[./]/);
+                if (issuedParts.length === 3) {
+                    // Using relative spacing from the start X provided
+                    drawCharByChar(issuedParts[0], coords.issued.x, fromTop(coords.issued.y), 15);
+                    drawCharByChar(issuedParts[1], coords.issued.x + 60, fromTop(coords.issued.y), 15);
+                    drawCharByChar(issuedParts[2], coords.issued.x + 125, fromTop(coords.issued.y), 15);
                 }
 
                 // Row 8: Commences On - DD / MM / YYYY
                 const commenceDate = req.body.commenceDate || currentDate;
                 const commenceParts = commenceDate.split(/[./]/);
                 if (commenceParts.length === 3) {
-                    drawCharByChar(commenceParts[0], 320, fromTop(getAdjustedY(450)), 13.5); // DD
-                    drawCharByChar(commenceParts[1], 380, fromTop(getAdjustedY(450)), 13.5); // MM
-                    drawCharByChar(commenceParts[2], 445, fromTop(getAdjustedY(450)), 13.5); // YYYY
+                    drawCharByChar(commenceParts[0], coords.commence.x, fromTop(coords.commence.y), 13.5);
+                    drawCharByChar(commenceParts[1], coords.commence.x + 60, fromTop(coords.commence.y), 13.5);
+                    drawCharByChar(commenceParts[2], coords.commence.x + 125, fromTop(coords.commence.y), 13.5);
                 }
 
                 // Row 9: Expires On - DD / MM / YYYY
                 const expireDate = req.body.expireDate || currentDate;
                 const expireParts = expireDate.split(/[./]/);
                 if (expireParts.length === 3) {
-                    drawCharByChar(expireParts[0], 320, fromTop(getAdjustedY(490)), 13.5); // DD
-                    drawCharByChar(expireParts[1], 380, fromTop(getAdjustedY(490)), 13.5); // MM
-                    drawCharByChar(expireParts[2], 445, fromTop(getAdjustedY(490)), 13.5); // YYYY
+                    drawCharByChar(expireParts[0], coords.expire.x, fromTop(coords.expire.y), 13.5);
+                    drawCharByChar(expireParts[1], coords.expire.x + 60, fromTop(coords.expire.y), 13.5);
+                    drawCharByChar(expireParts[2], coords.expire.x + 125, fromTop(coords.expire.y), 13.5);
                 }
 
                 // Row 11: Payment Frequency - tick Monthly checkbox
-                drawCheckbox(335, fromTop(getAdjustedY(575)), 10);
+                drawCheckbox(coords.freq.x, fromTop(coords.freq.y), 10);
 
                 // Row 12: Fixed Amount 1
                 const amountStr = amount.toString();
-                drawCharByChar(amountStr, 235, fromTop(getAdjustedY(640)), 20);
+                drawCharByChar(amountStr, coords.amt1.x, fromTop(coords.amt1.y), 20);
 
                 // Row 13: Fixed Amount 2
-                drawCharByChar(amountStr, 235, fromTop(getAdjustedY(680)), 20);
+                drawCharByChar(amountStr, coords.amt2.x, fromTop(coords.amt2.y), 20);
 
 
             } catch (error) {
