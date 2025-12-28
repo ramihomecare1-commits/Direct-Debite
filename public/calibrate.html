@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDA Form Calibrator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+        }
+
+        #canvas-container {
+            position: relative;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background: white;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .marker {
+            position: absolute;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid red;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: red;
+            user-select: none;
+            z-index: 10;
+        }
+
+        .marker:hover {
+            background: rgba(255, 0, 0, 0.5);
+            z-index: 20;
+        }
+
+        .marker.active {
+            background: rgba(0, 255, 0, 0.3);
+            border-color: green;
+            color: green;
+        }
+
+        #controls {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .field-list {
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .field-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #output {
+            margin-top: 20px;
+            width: 100%;
+            height: 200px;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="canvas-container">
+        <canvas id="the-canvas"></canvas>
+    </div>
+
+    <div id="controls">
+        <h2>🔧 Calibrator</h2>
+        <p>Drag the red boxes to align with the form fields.</p>
+
+        <div class="field-list" id="fieldList"></div>
+
+        <button onclick="generateConfig()">Generate Config</button>
+        <textarea id="output" readonly placeholder="Config will appear here..."></textarea>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const fields = [
+            { id: 'bankName', label: 'Bank Name', x: 235, y: 170, w: 200, h: 20 },
+            { id: 'name', label: 'Account Title', x: 235, y: 210, w: 200, h: 20 },
+            { id: 'type', label: 'Account Type (Tick)', x: 405, y: 250, w: 20, h: 20 },
+            { id: 'iban', label: 'IBAN (Start)', x: 230, y: 295, w: 300, h: 20 },
+            { id: 'mobile', label: 'Mobile (Start)', x: 235, y: 330, w: 150, h: 20 },
+            { id: 'issued', label: 'Issued Date', x: 380, y: 410, w: 150, h: 20 },
+            { id: 'commence', label: 'Commence Date', x: 320, y: 450, w: 150, h: 20 },
+            { id: 'expire', label: 'Expire Date', x: 320, y: 490, w: 150, h: 20 },
+            { id: 'freq', label: 'Monthly (Tick)', x: 335, y: 575, w: 20, h: 20 },
+            { id: 'amt1', label: 'Amount 1', x: 235, y: 640, w: 100, h: 20 },
+            { id: 'amt2', label: 'Amount 2', x: 235, y: 680, w: 100, h: 20 },
+        ];
+
+        let pdfHeight = 0;
+
+        async function loadPDF() {
+            const loadingTask = pdfjsLib.getDocument('/DDA_FORM.pdf');
+            const pdf = await loadingTask.promise;
+            const page = await pdf.getPage(1);
+
+            const scale = 1.5;
+            const viewport = page.getViewport({ scale });
+            pdfHeight = viewport.height / scale; // Original PDF height
+
+            const canvas = document.getElementById('the-canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            await page.render(renderContext).promise;
+
+            initMarkers(scale);
+        }
+
+        function initMarkers(scale) {
+            const container = document.getElementById('canvas-container');
+            const fieldList = document.getElementById('fieldList');
+
+            fields.forEach(field => {
+                // Create Marker
+                const el = document.createElement('div');
+                el.className = 'marker';
+                el.id = `marker-${field.id}`;
+                el.textContent = field.label;
+                el.style.width = `${field.w * scale}px`;
+                el.style.height = `${field.h * scale}px`;
+
+                // Initial Position (convert PDF coords to Canvas coords)
+                // PDF Y is from bottom usually, but pdf-lib uses Y from bottom.
+                // However, our server.js uses "fromTop".
+                // Let's assume the Y in our fields array is "Y from Top".
+                el.style.left = `${field.x * scale}px`;
+                el.style.top = `${field.y * scale}px`;
+
+                makeDraggable(el, scale, field);
+                container.appendChild(el);
+
+                // Add to list
+                const item = document.createElement('div');
+                item.className = 'field-item';
+                item.innerHTML = `<span>${field.label}</span> <span id="coord-${field.id}">X:${field.x}, Y:${field.y}</span>`;
+                fieldList.appendChild(item);
+            });
+        }
+
+        function makeDraggable(el, scale, field) {
+            let isDragging = false;
+            let startX, startY, initialLeft, initialTop;
+
+            el.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                el.classList.add('active');
+                startX = e.clientX;
+                startY = e.clientY;
+                initialLeft = parseFloat(el.style.left);
+                initialTop = parseFloat(el.style.top);
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+
+                const newLeft = initialLeft + dx;
+                const newTop = initialTop + dy;
+
+                el.style.left = `${newLeft}px`;
+                el.style.top = `${newTop}px`;
+
+                // Update coordinates display (convert back to PDF points)
+                const pdfX = Math.round(newLeft / scale);
+                const pdfY = Math.round(newTop / scale);
+
+                field.x = pdfX;
+                field.y = pdfY;
+
+                document.getElementById(`coord-${field.id}`).textContent = `X:${pdfX}, Y:${pdfY}`;
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                el.classList.remove('active');
+            });
+        }
+
+        function generateConfig() {
+            const config = fields.reduce((acc, field) => {
+                acc[field.id] = { x: field.x, y: field.y };
+                return acc;
+            }, {});
+
+            const json = JSON.stringify(config, null, 2);
+            document.getElementById('output').value = json;
+
+            // Also format as JS code for server.js
+            console.log("Copy this to server.js:");
+            console.log(json);
+        }
+
+        loadPDF();
+    </script>
+</body>
+
+</html>
