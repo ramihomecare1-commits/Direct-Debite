@@ -152,14 +152,14 @@ app.post('/fill', async (req, res) => {
                     bankName: { x: 216, y: 262 },
                     name: { x: 193, y: 282 },
                     type: { x: 248, y: 302 },
-                    iban: { x: 155, y: 327 },
-                    mobile: { x: 217, y: 353 },
-                    issued: { x: 222, y: 393 },
-                    commence: { x: 221, y: 415 },
-                    expire: { x: 220, y: 437 },
-                    freq: { x: 207, y: 493 },
-                    amt1: { x: 198, y: 524 },
-                    amt2: { x: 202, y: 551 }
+                    iban: { x: 141, y: 330, spacing: 13.95 },
+                    mobile: { x: 150, y: 354, spacing: 32.11 },
+                    issued: { x: 193, y: 393, spacing: 44 },
+                    commence: { x: 204, y: 415, spacing: 18 },
+                    expire: { x: 202, y: 436, spacing: 22 },
+                    freq: { x: 206, y: 490 },
+                    amt1: { x: 234, y: 526, spacing: 18.33 },
+                    amt2: { x: 233, y: 552, spacing: 18 }
                 };
 
                 // Row 1: Bank Name
@@ -185,38 +185,40 @@ app.post('/fill', async (req, res) => {
 
                 // Row 4: IBAN
                 const ibanClean = iban.replace(/\s/g, '');
-                drawCharByChar(ibanClean, coords.iban.x, fromTop(coords.iban.y), 13.5);
+                drawCharByChar(ibanClean, coords.iban.x, fromTop(coords.iban.y), coords.iban.spacing);
 
                 // Row 5: Mobile Number
                 const mobile = req.body.mobile || '';
-                drawCharByChar(mobile, coords.mobile.x, fromTop(coords.mobile.y), 13.5);
+                drawCharByChar(mobile, coords.mobile.x, fromTop(coords.mobile.y), coords.mobile.spacing);
 
                 // Row 7: Issued for - DD MM YYYY
                 const issuedDate = req.body.commenceDate || currentDate;
                 const issuedParts = issuedDate.split(/[./]/);
                 if (issuedParts.length === 3) {
                     // Using relative spacing from the start X provided
-                    drawCharByChar(issuedParts[0], coords.issued.x, fromTop(coords.issued.y), 15);
-                    drawCharByChar(issuedParts[1], coords.issued.x + 60, fromTop(coords.issued.y), 15);
-                    drawCharByChar(issuedParts[2], coords.issued.x + 125, fromTop(coords.issued.y), 15);
+                    // Note: User only calibrated the DD part, so we use relative offsets for MM and YYYY
+                    // but apply the user's custom spacing for characters
+                    drawCharByChar(issuedParts[0], coords.issued.x, fromTop(coords.issued.y), coords.issued.spacing);
+                    drawCharByChar(issuedParts[1], coords.issued.x + 60, fromTop(coords.issued.y), coords.issued.spacing);
+                    drawCharByChar(issuedParts[2], coords.issued.x + 125, fromTop(coords.issued.y), coords.issued.spacing);
                 }
 
                 // Row 8: Commences On - DD / MM / YYYY
                 const commenceDate = req.body.commenceDate || currentDate;
                 const commenceParts = commenceDate.split(/[./]/);
                 if (commenceParts.length === 3) {
-                    drawCharByChar(commenceParts[0], coords.commence.x, fromTop(coords.commence.y), 13.5);
-                    drawCharByChar(commenceParts[1], coords.commence.x + 60, fromTop(coords.commence.y), 13.5);
-                    drawCharByChar(commenceParts[2], coords.commence.x + 125, fromTop(coords.commence.y), 13.5);
+                    drawCharByChar(commenceParts[0], coords.commence.x, fromTop(coords.commence.y), coords.commence.spacing);
+                    drawCharByChar(commenceParts[1], coords.commence.x + 60, fromTop(coords.commence.y), coords.commence.spacing);
+                    drawCharByChar(commenceParts[2], coords.commence.x + 125, fromTop(coords.commence.y), coords.commence.spacing);
                 }
 
                 // Row 9: Expires On - DD / MM / YYYY
                 const expireDate = req.body.expireDate || currentDate;
                 const expireParts = expireDate.split(/[./]/);
                 if (expireParts.length === 3) {
-                    drawCharByChar(expireParts[0], coords.expire.x, fromTop(coords.expire.y), 13.5);
-                    drawCharByChar(expireParts[1], coords.expire.x + 60, fromTop(coords.expire.y), 13.5);
-                    drawCharByChar(expireParts[2], coords.expire.x + 125, fromTop(coords.expire.y), 13.5);
+                    drawCharByChar(expireParts[0], coords.expire.x, fromTop(coords.expire.y), coords.expire.spacing);
+                    drawCharByChar(expireParts[1], coords.expire.x + 60, fromTop(coords.expire.y), coords.expire.spacing);
+                    drawCharByChar(expireParts[2], coords.expire.x + 125, fromTop(coords.expire.y), coords.expire.spacing);
                 }
 
                 // Row 11: Payment Frequency - tick Monthly checkbox
@@ -224,10 +226,10 @@ app.post('/fill', async (req, res) => {
 
                 // Row 12: Fixed Amount 1
                 const amountStr = amount.toString();
-                drawCharByChar(amountStr, coords.amt1.x, fromTop(coords.amt1.y), 20);
+                drawCharByChar(amountStr, coords.amt1.x, fromTop(coords.amt1.y), coords.amt1.spacing);
 
                 // Row 13: Fixed Amount 2
-                drawCharByChar(amountStr, coords.amt2.x, fromTop(coords.amt2.y), 20);
+                drawCharByChar(amountStr, coords.amt2.x, fromTop(coords.amt2.y), coords.amt2.spacing);
 
 
             } catch (error) {
